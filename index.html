@@ -86,14 +86,23 @@
             <h2 id="library-heading">Library</h2>
             <p id="prompt-count" class="count">0 saved</p>
           </div>
-          <label class="search-field">
-            <span class="visually-hidden">Search prompts</span>
-            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none" />
-              <path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
-            <input id="search-input" type="search" placeholder="Search titles and content" />
-          </label>
+          <div class="library-controls">
+            <label class="search-field">
+              <span class="visually-hidden">Search prompts</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none" />
+                <path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+              <input id="search-input" type="search" placeholder="Search titles and content" />
+            </label>
+            <label class="sort-field">
+              <span class="visually-hidden">Sort prompts</span>
+              <select id="sort-select">
+                <option value="newest">Newest</option>
+                <option value="rating">Highest rated</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div id="prompt-list" class="prompt-list"></div>

@@ -9,6 +9,7 @@
   const listEl = document.getElementById("prompt-list");
   const countEl = document.getElementById("prompt-count");
   const searchInput = document.getElementById("search-input");
+  const sortSelect = document.getElementById("sort-select");
   const toastEl = document.getElementById("toast");
   const dialog = document.getElementById("confirm-dialog");
   const confirmCopy = document.getElementById("confirm-copy");
@@ -41,6 +42,7 @@
   });
 
   searchInput.addEventListener("input", render);
+  sortSelect.addEventListener("change", render);
 
   cancelDeleteBtn.addEventListener("click", () => dialog.close());
   confirmDeleteBtn.addEventListener("click", () => {
@@ -73,6 +75,7 @@
       title,
       content,
       createdAt: Date.now(),
+      rating: 0,
     });
 
     if (!persist()) {
@@ -95,13 +98,21 @@
 
   function render() {
     const query = searchInput.value.trim().toLowerCase();
-    const visible = query
+    let visible = query
       ? prompts.filter(
           (prompt) =>
             prompt.title.toLowerCase().includes(query) ||
             prompt.content.toLowerCase().includes(query)
         )
       : prompts;
+
+    if (sortSelect.value === "rating") {
+      visible = visible.slice().sort((a, b) => {
+        const ratingDelta = (b.rating || 0) - (a.rating || 0);
+        if (ratingDelta !== 0) return ratingDelta;
+        return b.createdAt - a.createdAt;
+      });
+    }
 
     countEl.textContent = `${prompts.length} saved`;
     listEl.replaceChildren();
@@ -121,6 +132,7 @@
 
   function createCard(prompt) {
     const card = el("article", "prompt-card");
+    card.dataset.promptId = prompt.id;
 
     const title = el("h3");
     title.textContent = prompt.title;
@@ -154,9 +166,99 @@
     });
 
     actions.append(copyBtn, deleteBtn);
-    meta.append(date, actions);
+    meta.append(date, createStarRating(prompt), actions);
     card.append(title, body, meta);
     return card;
+  }
+
+  function createStarRating(prompt) {
+    const rating = prompt.rating || 0;
+    const widget = el("div", "star-rating");
+    widget.setAttribute("role", "radiogroup");
+    widget.setAttribute("aria-label", ratingAriaLabel(rating, prompt.title));
+
+    const row = el("div", "star-row");
+    for (let value = 1; value <= 5; value += 1) {
+      const button = el("button", "star");
+      button.type = "button";
+      button.dataset.value = String(value);
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(rating === value));
+      button.setAttribute("aria-label", `${value} star${value === 1 ? "" : "s"}`);
+      button.title = `${value} star${value === 1 ? "" : "s"}`;
+      button.tabIndex = rating === value || (rating === 0 && value === 1) ? 0 : -1;
+      button.append(starIcon());
+      button.addEventListener("click", () => setRating(prompt.id, value, true));
+      row.append(button);
+    }
+    paintStars(row, rating);
+
+    row.addEventListener("pointerover", (event) => {
+      const star = event.target.closest(".star");
+      if (!star || !row.contains(star)) return;
+      paintStars(row, Number(star.dataset.value));
+    });
+    row.addEventListener("pointerleave", () => paintStars(row, rating));
+
+    widget.addEventListener("keydown", (event) => {
+      const next = nextRatingFromKey(event.key, rating);
+      if (next == null) return;
+      event.preventDefault();
+      setRating(prompt.id, next, false);
+    });
+
+    const label = el("span", "rating-label");
+    label.textContent = rating ? `${rating}/5` : "Not rated";
+
+    widget.append(row, label);
+    return widget;
+  }
+
+  function nextRatingFromKey(key, rating) {
+    if (key === "ArrowRight" || key === "ArrowUp") return Math.min(5, rating === 0 ? 1 : rating + 1);
+    if (key === "ArrowLeft" || key === "ArrowDown") return Math.max(1, rating === 0 ? 1 : rating - 1);
+    if (key === "Home") return 1;
+    if (key === "End") return 5;
+    return null;
+  }
+
+  function setRating(promptId, stars, toggleSame) {
+    const prompt = prompts.find((item) => item.id === promptId);
+    if (!prompt) return;
+
+    const next = Number(stars);
+    if (!Number.isInteger(next) || next < 1 || next > 5) return;
+
+    const previous = prompt.rating || 0;
+    const rating = toggleSame && previous === next ? 0 : next;
+    if (rating === previous) return;
+
+    prompt.rating = rating;
+    if (!persist()) {
+      prompt.rating = previous;
+      showToast("Could not save rating");
+      return;
+    }
+
+    render();
+    focusRatingStar(promptId, rating === 0 ? 1 : rating);
+    showToast(rating === 0 ? "Rating cleared" : `Rated ${rating} star${rating === 1 ? "" : "s"}`);
+  }
+
+  function focusRatingStar(promptId, value) {
+    const card = listEl.querySelector(`[data-prompt-id="${CSS.escape(promptId)}"]`);
+    card?.querySelector(`.star[data-value="${value}"]`)?.focus();
+  }
+
+  function paintStars(row, rating) {
+    row.querySelectorAll(".star").forEach((star) => {
+      star.classList.toggle("is-filled", Number(star.dataset.value) <= rating);
+    });
+  }
+
+  function ratingAriaLabel(rating, title) {
+    const summary = rating ? `${rating} out of 5 stars` : "not rated";
+    return `Rate “${title}”, ${summary}`;
   }
 
   function emptyState(heading, detail) {
@@ -174,10 +276,21 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.map(normalizePrompt) : [];
     } catch {
       return [];
     }
+  }
+
+  function normalizePrompt(prompt) {
+    if (!prompt || typeof prompt !== "object") {
+      return { id: createId(), title: "", content: "", createdAt: Date.now(), rating: 0 };
+    }
+    const rating = Number(prompt.rating);
+    return {
+      ...prompt,
+      rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : 0,
+    };
   }
 
   function persist() {
@@ -232,6 +345,14 @@
     button.title = label;
     button.append(svg);
     return button;
+  }
+
+  function starIcon() {
+    const svg = svgEl("0 0 16 16");
+    svg.append(
+      pathEl("M8 1.4 9.94 5.33l4.36.64-3.15 3.07.74 4.32L8 11.32l-3.89 2.04.74-4.32-3.15-3.07 4.36-.64L8 1.4Z")
+    );
+    return svg;
   }
 
   function copyIcon() {

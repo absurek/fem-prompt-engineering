@@ -241,8 +241,10 @@ textarea:focus,
 
 .btn:focus-visible,
 .icon-btn:focus-visible,
+.star:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
@@ -283,8 +285,18 @@ textarea:focus-visible {
   display: flex;
   justify-content: space-between;
   align-items: end;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.library-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .search-field {
@@ -292,6 +304,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 8px;
   min-width: min(100%, 260px);
+  width: min(100%, 260px);
   padding: 0 12px;
   color: var(--ink-soft);
   background: var(--bg-raised);
@@ -308,6 +321,30 @@ textarea:focus-visible {
 
 .search-field input:focus {
   box-shadow: none;
+}
+
+.sort-field {
+  display: flex;
+  align-items: center;
+  color: var(--ink-soft);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.sort-field select {
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.sort-field:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
 }
 
 .prompt-list {
@@ -346,11 +383,58 @@ textarea:focus-visible {
 .prompt-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding-top: 4px;
   border-top: 1px solid var(--line);
   color: var(--ink-faint);
   font-size: 0.78rem;
+}
+
+.star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.star-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.star {
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.star svg path {
+  fill: transparent;
+}
+
+.star.is-filled {
+  color: var(--gold);
+}
+
+.star.is-filled svg path {
+  fill: currentColor;
+}
+
+.star:hover,
+.star:focus-visible {
+  background: var(--gold-glow);
+}
+
+.rating-label {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .prompt-actions {
@@ -492,8 +576,19 @@ textarea:focus-visible {
     align-items: stretch;
   }
 
-  .search-field {
+  .library-controls {
+    flex-wrap: wrap;
+  }
+
+  .library-controls,
+  .search-field,
+  .sort-field {
     min-width: 0;
+    width: 100%;
+  }
+
+  .sort-field select {
+    width: 100%;
   }
 
   .shortcut {
