@@ -76,6 +76,7 @@
       content,
       createdAt: Date.now(),
       rating: 0,
+      notes: [],
     });
 
     if (!persist()) {
@@ -167,8 +168,150 @@
 
     actions.append(copyBtn, deleteBtn);
     meta.append(date, createStarRating(prompt), actions);
-    card.append(title, body, meta);
+    card.append(title, body, createNotesSection(prompt), meta);
     return card;
+  }
+
+  function createNotesSection(prompt) {
+    const section = el("section", "notes");
+    section.dataset.promptId = prompt.id;
+
+    const heading = el("h4");
+    heading.textContent = "Notes";
+
+    const list = el("ul", "notes-list");
+    (prompt.notes || []).forEach((note) => {
+      list.append(createNoteItem(prompt.id, note));
+    });
+
+    const form = el("form", "note-form");
+    const textarea = document.createElement("textarea");
+    textarea.rows = 3;
+    textarea.placeholder = "Add a note…";
+    textarea.setAttribute("aria-label", `New note for ${prompt.title}`);
+
+    const saveBtn = el("button", "btn btn-primary btn-compact");
+    saveBtn.type = "submit";
+    saveBtn.textContent = "Save note";
+
+    form.append(textarea, saveBtn);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addNote(prompt.id, textarea.value);
+    });
+
+    section.append(heading, list, form);
+    return section;
+  }
+
+  function createNoteItem(promptId, note) {
+    const item = el("li", "note");
+    item.dataset.noteId = note.id;
+
+    const text = el("p", "note-text");
+    text.textContent = note.text;
+
+    const actions = el("div", "note-actions");
+    const editBtn = el("button", "btn btn-ghost btn-compact");
+    editBtn.type = "button";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => startEditNote(item, promptId, note));
+
+    const deleteBtn = el("button", "btn btn-danger btn-compact");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => deleteNote(promptId, note.id));
+
+    actions.append(editBtn, deleteBtn);
+    item.append(text, actions);
+    return item;
+  }
+
+  function startEditNote(item, promptId, note) {
+    const form = el("form", "note-form");
+    const textarea = document.createElement("textarea");
+    textarea.rows = 3;
+    textarea.value = note.text;
+    textarea.setAttribute("aria-label", "Edit note");
+
+    const saveBtn = el("button", "btn btn-primary btn-compact");
+    saveBtn.type = "submit";
+    saveBtn.textContent = "Save";
+
+    form.append(textarea, saveBtn);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      editNote(promptId, note.id, textarea.value);
+    });
+
+    item.replaceChildren(form);
+    textarea.focus();
+  }
+
+  function addNote(promptId, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const prompt = prompts.find((item) => item.id === promptId);
+    if (!prompt) return;
+
+    prompt.notes = prompt.notes || [];
+    prompt.notes.push({
+      id: createId(),
+      text: trimmed,
+      updatedAt: Date.now(),
+    });
+
+    if (!persist()) {
+      prompt.notes.pop();
+      showToast("Could not save note");
+      return;
+    }
+
+    render();
+  }
+
+  function editNote(promptId, noteId, text) {
+    const trimmed = text.trim();
+    const prompt = prompts.find((item) => item.id === promptId);
+    if (!prompt) return;
+
+    const note = (prompt.notes || []).find((item) => item.id === noteId);
+    if (!note) return;
+
+    if (!trimmed) {
+      render();
+      return;
+    }
+
+    const previous = { text: note.text, updatedAt: note.updatedAt };
+    note.text = trimmed;
+    note.updatedAt = Date.now();
+
+    if (!persist()) {
+      note.text = previous.text;
+      note.updatedAt = previous.updatedAt;
+      showToast("Could not save note");
+      return;
+    }
+
+    render();
+  }
+
+  function deleteNote(promptId, noteId) {
+    const prompt = prompts.find((item) => item.id === promptId);
+    if (!prompt) return;
+
+    const previous = prompt.notes;
+    prompt.notes = (prompt.notes || []).filter((note) => note.id !== noteId);
+
+    if (!persist()) {
+      prompt.notes = previous;
+      showToast("Could not delete note");
+      return;
+    }
+
+    render();
   }
 
   function createStarRating(prompt) {
@@ -284,13 +427,26 @@
 
   function normalizePrompt(prompt) {
     if (!prompt || typeof prompt !== "object") {
-      return { id: createId(), title: "", content: "", createdAt: Date.now(), rating: 0 };
+      return { id: createId(), title: "", content: "", createdAt: Date.now(), rating: 0, notes: [] };
     }
     const rating = Number(prompt.rating);
     return {
       ...prompt,
       rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : 0,
+      notes: normalizeNotes(prompt.notes),
     };
+  }
+
+  function normalizeNotes(notes) {
+    if (!Array.isArray(notes)) return [];
+    return notes
+      .filter((note) => note && typeof note === "object")
+      .map((note) => ({
+        id: typeof note.id === "string" && note.id ? note.id : createId(),
+        text: typeof note.text === "string" ? note.text : "",
+        updatedAt: Number(note.updatedAt) || Date.now(),
+      }))
+      .filter((note) => note.text.trim());
   }
 
   function persist() {

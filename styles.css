@@ -380,6 +380,73 @@ select:focus-visible {
   overflow: auto;
 }
 
+.notes {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.notes h4 {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.notes-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.note-text {
+  margin: 0;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.note-form {
+  display: grid;
+  gap: 8px;
+}
+
+.note-form textarea,
+.note textarea {
+  min-height: 72px;
+}
+
+.btn-compact {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+}
+
+.note-form .btn-primary {
+  width: auto;
+  justify-self: start;
+}
+
 .prompt-meta {
   display: flex;
   align-items: center;
@@ -569,6 +636,11 @@ select:focus-visible {
 
   textarea {
     min-height: 120px;
+  }
+
+  .note-form textarea,
+  .note textarea {
+    min-height: 72px;
   }
 
   .library-toolbar {
