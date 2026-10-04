@@ -58,6 +58,19 @@
           </label>
 
           <label class="field">
+            <span>Model</span>
+            <input
+              id="prompt-model"
+              name="model"
+              type="text"
+              maxlength="100"
+              autocomplete="off"
+              placeholder="e.g. grok-4"
+              required
+            />
+          </label>
+
+          <label class="field">
             <span class="field-top">
               Content
               <span id="char-count" class="char-count">0</span>
@@ -69,6 +82,11 @@
               placeholder="Write the prompt you want to reuse…"
               required
             ></textarea>
+          </label>
+
+          <label class="check-field">
+            <input id="prompt-is-code" name="isCode" type="checkbox" />
+            <span>Estimate as code</span>
           </label>
 
           <p id="form-error" class="form-error" role="alert" hidden></p>
@@ -99,6 +117,7 @@
               <span class="visually-hidden">Sort prompts</span>
               <select id="sort-select">
                 <option value="newest">Newest</option>
+                <option value="created">Created (newest)</option>
                 <option value="rating">Highest rated</option>
               </select>
             </label>

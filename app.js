@@ -1,8 +1,11 @@
 (() => {
   const STORAGE_KEY = "prompt-library.prompts";
+  const ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
   const form = document.getElementById("prompt-form");
   const titleInput = document.getElementById("prompt-title");
+  const modelInput = document.getElementById("prompt-model");
+  const isCodeInput = document.getElementById("prompt-is-code");
   const contentInput = document.getElementById("prompt-content");
   const charCount = document.getElementById("char-count");
   const formError = document.getElementById("form-error");
@@ -64,9 +67,18 @@
   function savePrompt() {
     const title = titleInput.value.trim();
     const content = contentInput.value.trim();
+    const modelName = modelInput.value.trim();
 
     if (!title || !content) {
       showFormError("Add both a title and content before saving.");
+      return;
+    }
+
+    let metadata;
+    try {
+      metadata = trackModel(modelName, content, isCodeInput.checked);
+    } catch (error) {
+      showFormError(error instanceof Error ? error.message : "Could not track model metadata.");
       return;
     }
 
@@ -74,9 +86,10 @@
       id: createId(),
       title,
       content,
-      createdAt: Date.now(),
+      createdAt: Date.parse(metadata.createdAt) || Date.now(),
       rating: 0,
       notes: [],
+      metadata,
     });
 
     if (!persist()) {
@@ -111,8 +124,10 @@
       visible = visible.slice().sort((a, b) => {
         const ratingDelta = (b.rating || 0) - (a.rating || 0);
         if (ratingDelta !== 0) return ratingDelta;
-        return b.createdAt - a.createdAt;
+        return metadataCreatedMs(b) - metadataCreatedMs(a);
       });
+    } else {
+      visible = visible.slice().sort((a, b) => metadataCreatedMs(b) - metadataCreatedMs(a));
     }
 
     countEl.textContent = `${prompts.length} saved`;
@@ -141,10 +156,13 @@
     const body = el("p", "prompt-body");
     body.textContent = prompt.content;
 
+    const journalMeta = createJournalMeta(prompt);
+
     const meta = el("div", "prompt-meta");
     const date = el("time");
-    date.dateTime = new Date(prompt.createdAt).toISOString();
-    date.textContent = formatDate(prompt.createdAt);
+    const createdMs = metadataCreatedMs(prompt);
+    date.dateTime = new Date(createdMs).toISOString();
+    date.textContent = formatDate(createdMs);
 
     const actions = el("div", "prompt-actions");
     const copyBtn = iconButton("Copy prompt", copyIcon());
@@ -168,8 +186,64 @@
 
     actions.append(copyBtn, deleteBtn);
     meta.append(date, createStarRating(prompt), actions);
-    card.append(title, body, createNotesSection(prompt), meta);
+    card.append(title, body, journalMeta, createNotesSection(prompt), meta);
     return card;
+  }
+
+  function createJournalMeta(prompt) {
+    const metadata = prompt.metadata;
+    const wrap = el("dl", "journal-meta");
+
+    const modelRow = el("div", "journal-meta-row");
+    const modelDt = el("dt");
+    modelDt.textContent = "Model";
+    const modelDd = el("dd");
+    modelDd.textContent = metadata?.model || "Unknown";
+    modelRow.append(modelDt, modelDd);
+
+    const timeRow = el("div", "journal-meta-row");
+    const createdDt = el("dt");
+    createdDt.textContent = "Created";
+    const createdDd = el("dd");
+    const createdTime = el("time");
+    createdTime.dateTime = metadata?.createdAt || new Date(prompt.createdAt).toISOString();
+    createdTime.textContent = formatDateTime(createdTime.dateTime);
+    createdDd.append(createdTime);
+
+    const updatedDt = el("dt");
+    updatedDt.textContent = "Updated";
+    const updatedDd = el("dd");
+    const updatedTime = el("time");
+    updatedTime.dateTime = metadata?.updatedAt || createdTime.dateTime;
+    updatedTime.textContent = formatDateTime(updatedTime.dateTime);
+    updatedDd.append(updatedTime);
+    timeRow.append(createdDt, createdDd, updatedDt, updatedDd);
+
+    const tokenRow = el("div", "journal-meta-row");
+    const tokenDt = el("dt");
+    tokenDt.textContent = "Tokens";
+    const tokenDd = el("dd", "token-estimate");
+    const estimate = metadata?.tokenEstimate;
+    const range = el("span");
+    range.textContent = estimate
+      ? `${Math.round(estimate.min)}–${Math.round(estimate.max)}`
+      : "n/a";
+    const confidence = el("span", `confidence confidence-${estimate?.confidence || "low"}`);
+    confidence.textContent = estimate?.confidence || "unknown";
+    tokenDd.append(range, confidence);
+    tokenRow.append(tokenDt, tokenDd);
+
+    wrap.append(modelRow, timeRow, tokenRow);
+    return wrap;
+  }
+
+  function touchMetadata(prompt) {
+    if (!prompt.metadata) return;
+    try {
+      prompt.metadata = updateTimestamps(prompt.metadata);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   function createNotesSection(prompt) {
@@ -261,6 +335,7 @@
       text: trimmed,
       updatedAt: Date.now(),
     });
+    touchMetadata(prompt);
 
     if (!persist()) {
       prompt.notes.pop();
@@ -287,6 +362,7 @@
     const previous = { text: note.text, updatedAt: note.updatedAt };
     note.text = trimmed;
     note.updatedAt = Date.now();
+    touchMetadata(prompt);
 
     if (!persist()) {
       note.text = previous.text;
@@ -304,6 +380,7 @@
 
     const previous = prompt.notes;
     prompt.notes = (prompt.notes || []).filter((note) => note.id !== noteId);
+    touchMetadata(prompt);
 
     if (!persist()) {
       prompt.notes = previous;
@@ -377,6 +454,7 @@
     if (rating === previous) return;
 
     prompt.rating = rating;
+    touchMetadata(prompt);
     if (!persist()) {
       prompt.rating = previous;
       showToast("Could not save rating");
@@ -434,7 +512,166 @@
       ...prompt,
       rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : 0,
       notes: normalizeNotes(prompt.notes),
+      metadata: normalizeMetadata(prompt),
     };
+  }
+
+  function normalizeMetadata(prompt) {
+    try {
+      if (prompt.metadata && typeof prompt.metadata === "object") {
+        const model = assertModelName(String(prompt.metadata.model || "unknown"));
+        const createdAt =
+          typeof prompt.metadata.createdAt === "string" && ISO_8601.test(prompt.metadata.createdAt)
+            ? prompt.metadata.createdAt
+            : new Date(prompt.createdAt || Date.now()).toISOString();
+        const updatedAt =
+          typeof prompt.metadata.updatedAt === "string" && ISO_8601.test(prompt.metadata.updatedAt)
+            ? prompt.metadata.updatedAt
+            : createdAt;
+        assertIso8601(createdAt, "createdAt");
+        const updatedMs = assertIso8601(updatedAt, "updatedAt");
+        const createdMs = Date.parse(createdAt);
+        if (updatedMs < createdMs) {
+          throw new Error("updatedAt must be greater than or equal to createdAt.");
+        }
+        const tokenEstimate =
+          prompt.metadata.tokenEstimate && typeof prompt.metadata.tokenEstimate === "object"
+            ? prompt.metadata.tokenEstimate
+            : estimateTokens(prompt.content || "", false);
+        return {
+          model,
+          createdAt,
+          updatedAt,
+          tokenEstimate: {
+            min: Number(tokenEstimate.min) || 0,
+            max: Number(tokenEstimate.max) || 0,
+            confidence: ["high", "medium", "low"].includes(tokenEstimate.confidence)
+              ? tokenEstimate.confidence
+              : "high",
+          },
+        };
+      }
+      return trackModel("unknown", prompt.content || "", false);
+    } catch {
+      const now = new Date().toISOString();
+      return {
+        model: "unknown",
+        createdAt: now,
+        updatedAt: now,
+        tokenEstimate: { min: 0, max: 0, confidence: "high" },
+      };
+    }
+  }
+
+  function metadataCreatedMs(prompt) {
+    const iso = prompt?.metadata?.createdAt;
+    const parsed = iso ? Date.parse(iso) : NaN;
+    if (Number.isFinite(parsed)) return parsed;
+    return Number(prompt.createdAt) || 0;
+  }
+
+  function assertIso8601(value, fieldName) {
+    if (typeof value !== "string" || !ISO_8601.test(value)) {
+      throw new Error(`${fieldName} must be a valid ISO 8601 string (YYYY-MM-DDTHH:mm:ss.sssZ).`);
+    }
+    const parsed = Date.parse(value);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`${fieldName} must be a valid ISO 8601 string (YYYY-MM-DDTHH:mm:ss.sssZ).`);
+    }
+    return parsed;
+  }
+
+  function assertModelName(modelName) {
+    if (typeof modelName !== "string") {
+      throw new Error("Model name must be a non-empty string.");
+    }
+    const trimmed = modelName.trim();
+    if (!trimmed) {
+      throw new Error("Model name must be a non-empty string.");
+    }
+    if (trimmed.length > 100) {
+      throw new Error("Model name must be at most 100 characters.");
+    }
+    return trimmed;
+  }
+
+  function estimateTokens(text, isCode) {
+    try {
+      if (typeof text !== "string") {
+        throw new Error("Text must be a string.");
+      }
+      const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const characterCount = text.length;
+      let min = 0.75 * wordCount;
+      let max = 0.25 * characterCount;
+      if (isCode) {
+        min *= 1.3;
+        max *= 1.3;
+      }
+      const midpoint = (min + max) / 2;
+      let confidence = "high";
+      if (midpoint > 5000) confidence = "low";
+      else if (midpoint >= 1000) confidence = "medium";
+      return { min, max, confidence };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Could not estimate tokens.");
+    }
+  }
+
+  function trackModel(modelName, content, isCode) {
+    try {
+      const model = assertModelName(modelName);
+      if (typeof content !== "string") {
+        throw new Error("Content must be a string.");
+      }
+      const createdAt = new Date().toISOString();
+      assertIso8601(createdAt, "createdAt");
+      return {
+        model,
+        createdAt,
+        updatedAt: createdAt,
+        tokenEstimate: estimateTokens(content, Boolean(isCode)),
+      };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Could not track model metadata.");
+    }
+  }
+
+  function updateTimestamps(metadata) {
+    try {
+      if (!metadata || typeof metadata !== "object") {
+        throw new Error("Metadata must be an object.");
+      }
+      const model = assertModelName(metadata.model);
+      const createdMs = assertIso8601(metadata.createdAt, "createdAt");
+      const updatedAt = new Date().toISOString();
+      const updatedMs = assertIso8601(updatedAt, "updatedAt");
+      if (updatedMs < createdMs) {
+        throw new Error("updatedAt must be greater than or equal to createdAt.");
+      }
+      const tokenEstimate = metadata.tokenEstimate;
+      if (
+        !tokenEstimate ||
+        typeof tokenEstimate !== "object" ||
+        typeof tokenEstimate.min !== "number" ||
+        typeof tokenEstimate.max !== "number" ||
+        !["high", "medium", "low"].includes(tokenEstimate.confidence)
+      ) {
+        throw new Error("tokenEstimate must include min, max, and confidence.");
+      }
+      return {
+        model,
+        createdAt: metadata.createdAt,
+        updatedAt,
+        tokenEstimate: {
+          min: tokenEstimate.min,
+          max: tokenEstimate.max,
+          confidence: tokenEstimate.confidence,
+        },
+      };
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Could not update timestamps.");
+    }
   }
 
   function normalizeNotes(notes) {
@@ -486,6 +723,16 @@
       day: "numeric",
       year: "numeric",
     }).format(new Date(timestamp));
+  }
+
+  function formatDateTime(isoOrMs) {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(isoOrMs));
   }
 
   function el(tag, className) {

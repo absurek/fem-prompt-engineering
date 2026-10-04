@@ -176,6 +176,81 @@ h1 {
   color: var(--ink-faint);
 }
 
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.check-field input {
+  width: auto;
+  accent-color: var(--gold);
+}
+
+.journal-meta {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.journal-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.journal-meta dt {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.journal-meta dd {
+  margin: 2px 0 0;
+}
+
+.token-estimate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.confidence-high {
+  color: #1a3a24;
+  background: #7dcea0;
+}
+
+.confidence-medium {
+  color: #3a2e0a;
+  background: #f4d35e;
+}
+
+.confidence-low {
+  color: #fff;
+  background: var(--danger);
+}
+
 input,
 textarea,
 button {
