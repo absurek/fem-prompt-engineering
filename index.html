@@ -117,10 +117,14 @@
               <span class="visually-hidden">Sort prompts</span>
               <select id="sort-select">
                 <option value="newest">Newest</option>
-                <option value="created">Created (newest)</option>
                 <option value="rating">Highest rated</option>
               </select>
             </label>
+            <div class="library-transfer">
+              <button type="button" class="btn btn-ghost btn-compact" id="export-button">Export</button>
+              <button type="button" class="btn btn-ghost btn-compact" id="import-button">Import</button>
+              <input id="import-file" type="file" accept="application/json,.json" hidden />
+            </div>
           </div>
         </div>
 
@@ -136,6 +140,29 @@
       <div class="dialog-actions">
         <button type="button" class="btn btn-ghost" id="cancel-delete">Cancel</button>
         <button type="button" class="btn btn-danger" id="confirm-delete">Delete</button>
+      </div>
+    </dialog>
+
+    <dialog id="import-dialog" class="confirm-dialog" aria-labelledby="import-title">
+      <h3 id="import-title">Import prompts?</h3>
+      <p id="import-copy">Choose how to apply this file to your library.</p>
+      <ul id="import-stats" class="import-stats"></ul>
+      <p id="import-error" class="form-error" hidden></p>
+      <div class="dialog-actions dialog-actions-wrap">
+        <button type="button" class="btn btn-ghost" id="cancel-import">Cancel</button>
+        <button type="button" class="btn btn-ghost" id="import-merge">Merge</button>
+        <button type="button" class="btn btn-primary" id="import-replace">Replace library</button>
+      </div>
+    </dialog>
+
+    <dialog id="conflict-dialog" class="confirm-dialog" aria-labelledby="conflict-title">
+      <h3 id="conflict-title">Duplicate prompt IDs</h3>
+      <p id="conflict-copy">Some imported prompts already exist in this library.</p>
+      <ul id="conflict-list" class="import-stats"></ul>
+      <div class="dialog-actions dialog-actions-wrap">
+        <button type="button" class="btn btn-ghost" id="cancel-conflict">Cancel</button>
+        <button type="button" class="btn btn-ghost" id="conflict-skip">Keep existing</button>
+        <button type="button" class="btn btn-primary" id="conflict-overwrite">Use imported</button>
       </div>
     </dialog>
 

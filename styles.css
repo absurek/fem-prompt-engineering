@@ -370,7 +370,7 @@ select:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -420,6 +420,31 @@ select:focus-visible {
 .sort-field:focus-within {
   border-color: var(--gold);
   box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.library-transfer {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.import-stats {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  list-style: none;
+  color: var(--ink-soft);
+  background: var(--bg-input);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 0.84rem;
+}
+
+.import-stats li + li {
+  margin-top: 6px;
+}
+
+.dialog-actions-wrap {
+  flex-wrap: wrap;
 }
 
 .prompt-list {
